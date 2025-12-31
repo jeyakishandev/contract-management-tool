@@ -1,0 +1,215 @@
+// Prisma Schema - Contract Management Tool
+// Basé sur MLD Variante SIMPLE (docs/MLD_V2.md)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// MODÈLE: User
+// ============================================
+// Rôle: Gestion des utilisateurs de l'application
+// 
+// Explication:
+// - email unique pour connexion
+// - password_hash: bcrypt (salt rounds 10) - jamais stocker mot de passe en clair
+// - role avec CHECK constraint (ADMIN, MANAGER, VIEWER)
+// - is_active: soft delete (désactiver au lieu de supprimer)
+// - Relations: 1 User peut créer plusieurs Contracts, Obligations, AuditLogs
+// - Relations: 1 User peut recevoir plusieurs Notifications
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  firstName    String    @map("first_name") @db.VarChar(100)
+  lastName     String    @map("last_name") @db.VarChar(100)
+  role         String    @default("VIEWER") @db.VarChar(20) // CHECK: ADMIN, MANAGER, VIEWER
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  // Relations
+  contractsCreated      Contract[]      @relation("ContractCreator")
+  obligationsCreated    Obligation[]    @relation("ObligationCreator")
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+// ============================================
+// MODÈLE: Contract
+// ============================================
+// Rôle: Gestion des contrats avec workflow d'état
+//
+// Explication:
+// - reference unique pour identifier un contrat
+// - status avec CHECK constraint (DRAFT → ACTIVE → SUSPENDED → CLOSING → ARCHIVED)
+// - dates: start_date obligatoire, end_date optionnel
+// - valeur: montant + devise (pour contrats internationaux)
+// - pdf_file_path: chemin vers PDF uploadé (stockage local dev, S3 prod)
+// - created_by_id: FK vers User (qui a créé le contrat)
+// - Relations: 1 Contract peut avoir plusieurs Obligations
+// - Contrainte métier: end_date >= start_date (gérée dans application, pas DB)
+model Contract {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  reference     String    @unique @db.VarChar(100)
+  description   String?   @db.Text
+  status        String    @default("DRAFT") @db.VarChar(20) // CHECK: DRAFT, ACTIVE, SUSPENDED, CLOSING, ARCHIVED
+  contractType  String?   @map("contract_type") @db.VarChar(50)
+  startDate     DateTime  @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  value         Decimal?  @db.Decimal(15, 2)
+  currency      String    @default("EUR") @db.VarChar(3)
+  pdfFilePath   String?   @map("pdf_file_path") @db.VarChar(500)
+  createdById   Int       @map("created_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  createdBy     User         @relation("ContractCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  obligations   Obligation[]
+
+  @@index([reference])
+  @@index([status])
+  @@index([createdById])
+  @@index([startDate, endDate])
+  @@index([status, startDate])
+  @@map("contracts")
+}
+
+// ============================================
+// MODÈLE: Obligation
+// ============================================
+// Rôle: Gestion des obligations/échéances liées aux contrats
+//
+// Explication:
+// - contract_id: FK vers Contract (CASCADE: si contrat supprimé, obligations aussi)
+// - obligation_type: type d'obligation (ex: "Paiement", "Renouvellement", "Livraison")
+// - due_date: date d'échéance obligatoire
+// - reminder_days: tableau [90, 60, 30] jours avant échéance pour rappels
+// - is_recurring: obligation récurrente (ex: paiement mensuel)
+// - recurrence_pattern: "MONTHLY", "QUARTERLY", "YEARLY" (si récurrent)
+// - status avec CHECK (PENDING → COMPLETED ou OVERDUE)
+// - completed_at: quand l'obligation a été complétée
+// - Relations: 1 Obligation peut avoir plusieurs Notifications
+// - Contraintes métier: 
+//   - Si is_recurring = true, recurrence_pattern obligatoire (géré app)
+//   - recurrence_end_date >= due_date (géré app)
+model Obligation {
+  id                  Int       @id @default(autoincrement())
+  contractId          Int       @map("contract_id")
+  title               String    @db.VarChar(255)
+  description         String?   @db.Text
+  obligationType      String    @map("obligation_type") @db.VarChar(50)
+  dueDate             DateTime  @map("due_date") @db.Date
+  reminderDays        Int[]     @default([90, 60, 30]) @map("reminder_days")
+  isRecurring         Boolean   @default(false) @map("is_recurring")
+  recurrencePattern   String?   @map("recurrence_pattern") @db.VarChar(50)
+  recurrenceEndDate   DateTime? @map("recurrence_end_date") @db.Date
+  status              String    @default("PENDING") @db.VarChar(20) // CHECK: PENDING, COMPLETED, OVERDUE
+  completedAt         DateTime? @map("completed_at")
+  createdById         Int       @map("created_by_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  contract            Contract      @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  createdBy           User          @relation("ObligationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  notifications       Notification[]
+
+  @@index([contractId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([dueDate, status])
+  @@index([isRecurring])
+  @@map("obligations")
+}
+
+// ============================================
+// MODÈLE: Notification
+// ============================================
+// Rôle: Notifications in-app et email pour rappels d'obligations
+//
+// Explication:
+// - user_id: utilisateur qui reçoit la notification
+// - obligation_id: obligation concernée (optionnel, peut être null pour notifications système)
+// - type: EMAIL, IN_APP, ou BOTH
+// - reminder_day: 90, 60, ou 30 jours avant échéance (pour éviter doublons)
+// - is_read: notification lue dans l'app
+// - email_sent: email envoyé avec succès
+// - Contrainte unique (obligation_id, user_id, reminder_day): éviter doublons
+// - Relations: FK vers User et Obligation
+model Notification {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  obligationId  Int?      @map("obligation_id")
+  type          String    @db.VarChar(20) // CHECK: EMAIL, IN_APP, BOTH
+  title         String    @db.VarChar(255)
+  message       String    @db.Text
+  reminderDay   Int       @map("reminder_day") // 90, 60, ou 30
+  isRead        Boolean   @default(false) @map("is_read")
+  emailSent     Boolean   @default(false) @map("email_sent")
+  emailSentAt   DateTime? @map("email_sent_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  obligation    Obligation?   @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+
+  @@unique([obligationId, userId, reminderDay])
+  @@index([userId])
+  @@index([obligationId])
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ============================================
+// MODÈLE: AuditLog
+// ============================================
+// Rôle: Trail d'audit pour toutes les actions critiques
+//
+// Explication:
+// - user_id: qui a fait l'action (FK vers User, RESTRICT: ne pas supprimer si logs existent)
+// - action_type: CREATE, UPDATE, DELETE, STATUS_CHANGE, etc.
+// - entity_type: "Contract", "Obligation", "User", etc.
+// - entity_id: ID de l'entité modifiée
+// - old_value / new_value: JSONB pour stocker avant/après (flexible)
+// - justification: texte obligatoire pour certaines actions (géré app)
+// - ip_address / user_agent: traçabilité sécurité
+// - Pas de relations inverses (pas besoin dans Prisma pour ce modèle)
+model AuditLog {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  actionType    String    @map("action_type") @db.VarChar(50)
+  entityType    String    @map("entity_type") @db.VarChar(50)
+  entityId      Int       @map("entity_id")
+  oldValue      Json?     @map("old_value") @db.JsonB
+  newValue      Json?     @map("new_value") @db.JsonB
+  justification String?   @db.Text
+  ipAddress     String?   @map("ip_address") @db.VarChar(45)
+  userAgent     String?   @map("user_agent") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([actionType])
+  @@index([createdAt(sort: Desc)])
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
