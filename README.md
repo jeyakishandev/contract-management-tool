@@ -150,11 +150,43 @@ npm run test         # Tests
 ### Prisma
 
 ```bash
-npx prisma migrate dev        # Créer et appliquer migration
-npx prisma migrate deploy     # Appliquer migrations (prod)
-npx prisma studio             # Interface graphique DB
-npx prisma generate           # Régénérer client Prisma
-npx prisma db seed            # Seed données
+# Générer le client Prisma (après modification du schema)
+npm run prisma:generate
+
+# Créer et appliquer une migration (développement)
+npm run prisma:migrate
+# OU
+npx prisma migrate dev --name nom_migration
+
+# Appliquer migrations existantes (production)
+npm run prisma:migrate:deploy
+# OU
+npx prisma migrate deploy
+
+# Interface graphique pour explorer la base de données
+npm run prisma:studio
+# OU
+npx prisma studio
+
+# Seed : initialiser données de référence (utilisateur admin)
+npm run db:seed
+# OU
+npm run prisma:seed
+
+# Push schéma directement (développement rapide, sans migration)
+npx prisma db push
+```
+
+**Première utilisation** :
+```bash
+# 1. Créer les tables (si pas déjà fait)
+npx prisma db push
+
+# 2. Générer le client Prisma
+npm run prisma:generate
+
+# 3. Seed données initiales (admin)
+npm run db:seed
 ```
 
 ### Frontend
