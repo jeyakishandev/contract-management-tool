@@ -109,6 +109,10 @@ Après `npm run seed` :
 - [Architecture Decision Records (ADR)](./docs/ADR/) - 8 ADR (choix techniques justifiés)
 - [Backlog Numéroté (T1-T37)](./docs/BACKLOG_NUMEROTE.md) ← **Recommandé pour développement**
 
+### Workflow & Décisions Techniques
+- [Workflow Git Professionnel](./docs/WORKFLOW_GIT.md) - Structure branches, PR, releases
+- [Explication Port 5432 → 5433](./docs/POURQUOI_PORT_5432.md) - Diagnostic et résolution de conflit Docker
+
 ### Analyses
 - [📊 Analyse du Projet & Feedback Candidature](./docs/ANALYSE_PROJET.md)
 - [📋 Évaluation Fonctionnalités](./docs/EVALUATION_FONCTIONNALITES.md)
