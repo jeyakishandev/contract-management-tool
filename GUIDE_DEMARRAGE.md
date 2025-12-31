@@ -4,13 +4,145 @@
 
 - **Node.js** : Version 18 ou supérieure
 - **npm** : Version 9 ou supérieure (ou yarn/pnpm)
-- **PostgreSQL** : Version 14 ou supérieure (pour plus tard, avec Prisma)
+- **Docker** : Version 20 ou supérieure + Docker Compose (pour PostgreSQL)
 - **Git** : Pour le contrôle de version
 
 Vérifier les versions :
 ```bash
-node --version  # Doit être >= 18
-npm --version   # Doit être >= 9
+node --version      # Doit être >= 18
+npm --version       # Doit être >= 9
+docker --version    # Doit être installé
+docker-compose --version  # Doit être installé
+```
+
+---
+
+## 🐳 Démarrage avec Docker (Recommandé)
+
+### Option A : PostgreSQL via Docker (Recommandé pour développement)
+
+**Avantages** :
+- ✅ Pas besoin d'installer PostgreSQL localement
+- ✅ Configuration automatique
+- ✅ Données persistées dans volume Docker
+- ✅ Facile à réinitialiser
+
+#### 1. Créer fichier `.env` à la racine (pour Docker Compose)
+
+Créer `.env` à la racine du projet :
+
+```bash
+cd /root/Contract
+cat > .env << EOF
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=contract_db
+NODE_ENV=development
+PORT=3001
+JWT_SECRET=your-secret-key-min-32-characters-change-in-production
+EOF
+```
+
+⚠️ **Ne jamais commiter `.env`** (déjà dans `.gitignore`)
+
+#### 2. Démarrer PostgreSQL avec Docker Compose
+
+```bash
+# Démarrer PostgreSQL (détaché, en arrière-plan)
+docker-compose up -d postgres
+
+# Vérifier que PostgreSQL est démarré et healthy
+docker-compose ps
+
+# Voir les logs
+docker-compose logs postgres
+```
+
+**Résultat attendu** :
+```
+CONTAINER ID   IMAGE                STATUS
+abc123...      postgres:15-alpine   Up (healthy)
+```
+
+**Variables d'environnement PostgreSQL** (dans `.env` racine) :
+- `POSTGRES_USER` : Utilisateur PostgreSQL (défaut: `postgres`)
+- `POSTGRES_PASSWORD` : Mot de passe PostgreSQL (défaut: `postgres`)
+- `POSTGRES_DB` : Nom de la base de données (défaut: `contract_db`)
+
+#### 3. Configurer `backend/.env` pour se connecter à PostgreSQL
+
+Créer `backend/.env` :
+
+```bash
+cd backend
+cat > .env << EOF
+PORT=3001
+NODE_ENV=development
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/contract_db?schema=public"
+JWT_SECRET="your-secret-key-min-32-characters-change-in-production"
+JWT_ACCESS_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+EOF
+```
+
+#### 4. Commandes Docker utiles
+
+```bash
+# Arrêter PostgreSQL
+docker-compose down
+
+# Arrêter et supprimer les volumes (⚠️ supprime les données)
+docker-compose down -v
+
+# Redémarrer PostgreSQL
+docker-compose restart postgres
+
+# Voir les logs en temps réel
+docker-compose logs -f postgres
+
+# Accéder au shell PostgreSQL
+docker-compose exec postgres psql -U postgres -d contract_db
+
+# Vérifier le healthcheck
+docker-compose ps
+```
+
+#### 5. Optionnel : Lancer le backend via Docker
+
+**Note** : Cette option nécessite un `Dockerfile` dans `backend/` (sera créé plus tard si besoin).
+
+```bash
+# Lancer backend + postgres ensemble
+docker-compose --profile backend up
+
+# Ou seulement backend (si postgres déjà lancé)
+docker-compose up backend
+```
+
+**Actuellement** : Le backend se lance mieux directement avec `npm run dev` (hot-reload).
+
+---
+
+### Option B : PostgreSQL installé localement
+
+Si vous préférez installer PostgreSQL localement :
+
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# macOS
+brew install postgresql
+brew services start postgresql
+
+# Créer la base de données
+createdb contract_db
+```
+
+Puis configurer `backend/.env` avec :
+```
+DATABASE_URL="postgresql://user:password@localhost:5432/contract_db?schema=public"
 ```
 
 ---
