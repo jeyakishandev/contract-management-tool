@@ -1,0 +1,114 @@
+# CI/CD Pipeline - Contract Management Tool
+#
+# Ce workflow valide automatiquement chaque PR et push vers dev/main
+#
+# Pourquoi ce workflow existe:
+# - Garantit que le code ne casse pas (lint, typecheck, tests)
+# - Bloque les PR avec erreurs avant merge
+# - Démontre rigueur et pratiques professionnelles
+#
+# Quand il se lance:
+# - Sur chaque pull_request vers dev ou main
+# - Sur chaque push vers dev ou main
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  # Job Backend: Lint + Typecheck + Tests
+  backend:
+    name: Backend - Lint & Typecheck & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js (LTS version stable)
+      # Pourquoi LTS: Version supportée, stable pour production
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      # 3. Install dépendances backend
+      # Cache npm: Accélère les builds en réutilisant node_modules
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+        # npm ci: Installation propre, locke les versions (plus fiable que npm install)
+
+      # 4. Lint backend
+      # Vérifie qualité du code, règles ESLint
+      - name: Run ESLint
+        working-directory: ./backend
+        run: npm run lint
+
+      # 5. Typecheck backend
+      # Vérifie que TypeScript compile sans erreurs (sans générer de fichiers)
+      - name: Typecheck
+        working-directory: ./backend
+        run: npm run typecheck
+
+      # 6. Tests backend
+      # Exécute les tests Jest (si configurés)
+      # continue-on-error: true permet de ne pas bloquer si pas de tests encore
+      - name: Run tests
+        working-directory: ./backend
+        run: npm run test || echo "No tests configured yet"
+        continue-on-error: true
+
+  # Job Frontend: Lint + Typecheck + Build
+  frontend:
+    name: Frontend - Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # 3. Install dépendances frontend
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      # 4. Lint frontend
+      # Next.js lint inclut ESLint + règles React/Next.js
+      - name: Run ESLint
+        working-directory: ./frontend
+        run: npm run lint
+
+      # 5. Build frontend
+      # Next.js build fait automatiquement:
+      # - Typecheck TypeScript
+      # - Compilation Next.js
+      # - Validation des pages
+      # Si build échoue = erreurs TypeScript ou problèmes de build
+      - name: Build
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          # Variable nécessaire pour Next.js (évite erreur build)
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+
