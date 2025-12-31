@@ -69,6 +69,8 @@ abc123...      postgres:15-alpine   Up (healthy)
 - `POSTGRES_PASSWORD` : Mot de passe PostgreSQL (défaut: `postgres`)
 - `POSTGRES_DB` : Nom de la base de données (défaut: `contract_db`)
 
+**⚠️ Note** : Le port externe est `5433` (pas `5432`) pour éviter les conflits avec d'autres conteneurs PostgreSQL.
+
 #### 3. Configurer `backend/.env` pour se connecter à PostgreSQL
 
 Créer `backend/.env` :
@@ -78,7 +80,7 @@ cd backend
 cat > .env << EOF
 PORT=3001
 NODE_ENV=development
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/contract_db?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/contract_db?schema=public"
 JWT_SECRET="your-secret-key-min-32-characters-change-in-production"
 JWT_ACCESS_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
@@ -142,7 +144,7 @@ createdb contract_db
 
 Puis configurer `backend/.env` avec :
 ```
-DATABASE_URL="postgresql://user:password@localhost:5432/contract_db?schema=public"
+DATABASE_URL="postgresql://user:password@localhost:5433/contract_db?schema=public"
 ```
 
 ---
@@ -343,7 +345,7 @@ npm run format:check  # Vérifie formatage (CI)
 |----------|-------------|---------|
 | `PORT` | Port serveur Express | `3001` |
 | `NODE_ENV` | Environnement (development/production) | `development` |
-| `DATABASE_URL` | URL PostgreSQL (Prisma) | `postgresql://user:pass@localhost:5432/db` |
+| `DATABASE_URL` | URL PostgreSQL (Prisma) | `postgresql://user:pass@localhost:5433/db` |
 | `JWT_SECRET` | Secret pour signer JWT | `your-secret-key-min-32-chars` |
 | `JWT_ACCESS_EXPIRES_IN` | Durée access token | `15m` |
 | `JWT_REFRESH_EXPIRES_IN` | Durée refresh token | `7d` |

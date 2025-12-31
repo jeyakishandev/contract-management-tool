@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     container_name: contract_postgres
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - '5433:5432'  # Port externe 5433 pour éviter conflit avec autres conteneurs
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
