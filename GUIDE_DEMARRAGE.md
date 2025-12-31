@@ -254,6 +254,37 @@ npm run dev
 
 ---
 
+## 🤖 CI/CD - Validation Automatique
+
+### GitHub Actions
+
+Le projet inclut un workflow GitHub Actions qui valide automatiquement chaque PR et push.
+
+**Fichier** : `.github/workflows/ci.yml`
+
+**Quand la CI se lance** :
+- Sur chaque **pull request** vers `dev` ou `main`
+- Sur chaque **push** vers `dev` ou `main`
+
+**Ce qui est vérifié automatiquement** :
+
+#### Backend
+1. ✅ **Lint** : ESLint vérifie la qualité du code
+2. ✅ **Typecheck** : TypeScript compile sans erreurs (`tsc --noEmit`)
+3. ✅ **Tests** : Tests Jest (si configurés)
+
+#### Frontend
+1. ✅ **Lint** : Next.js ESLint vérifie le code React/Next.js
+2. ✅ **Build** : Next.js build vérifie TypeScript + compilation
+
+**Résultat** :
+- ✅ Si toutes les étapes passent → CI verte, PR peut être mergée
+- ❌ Si une étape échoue → CI rouge, PR bloquée (doit corriger avant merge)
+
+**Voir le statut** : Onglet "Actions" sur GitHub, ou badge de statut dans la PR
+
+---
+
 ## 🛠️ Scripts Disponibles
 
 ### Backend (`backend/package.json`)
