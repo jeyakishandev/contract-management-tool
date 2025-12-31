@@ -63,12 +63,15 @@ jobs:
         run: npm run typecheck
 
       # 6. Tests backend
-      # Exécute les tests Jest (si configurés)
-      # continue-on-error: true permet de ne pas bloquer si pas de tests encore
+      # Exécute les tests Jest
+      # Si pas de tests configurés, Jest retournera une erreur mais on continue pour l'instant
+      # TODO: Retirer continue-on-error une fois les tests implémentés
       - name: Run tests
         working-directory: ./backend
-        run: npm run test || echo "No tests configured yet"
+        run: npm run test
         continue-on-error: true
+        # continue-on-error: Permet de ne pas bloquer la CI tant que les tests ne sont pas implémentés
+        # À retirer une fois les tests écrits (ticket T5+)
 
   # Job Frontend: Lint + Typecheck + Build
   frontend:
